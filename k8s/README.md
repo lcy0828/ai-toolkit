@@ -4,6 +4,7 @@
 
 ## 文件说明
 
+- `namespace.yaml` - 命名空间定义，所有资源将部署到 `ai-toolkit` 命名空间
 - `deployment.yaml` - 主部署配置，包含容器、资源限制、卷挂载等
 - `service.yaml` - 服务配置，用于暴露应用端口
 - `pvc.yaml` - 持久化卷声明，用于数据存储
@@ -18,7 +19,22 @@
 
 ## 部署步骤
 
-### 1. 创建密钥
+### 1. 创建命名空间
+
+首先创建命名空间：
+
+```bash
+kubectl apply -f namespace.yaml
+```
+
+或者使用部署脚本自动创建（推荐）：
+
+```bash
+cd k8s
+./deploy.sh
+```
+
+### 2. 创建密钥
 
 首先，复制示例密钥文件并设置你的认证令牌：
 
@@ -33,7 +49,7 @@ cp secret.yaml.example secret.yaml
 kubectl apply -f secret.yaml
 ```
 
-### 2. 创建持久化卷声明
+### 3. 创建持久化卷声明
 
 创建所有需要的 PVC：
 
@@ -43,7 +59,7 @@ kubectl apply -f pvc.yaml
 
 **注意**：根据你的实际需求调整 PVC 中的存储大小和存储类名称。
 
-### 3. 部署应用
+### 4. 部署应用
 
 创建 Deployment：
 
@@ -51,7 +67,7 @@ kubectl apply -f pvc.yaml
 kubectl apply -f deployment.yaml
 ```
 
-### 4. 创建服务
+### 5. 创建服务
 
 创建 Service 以暴露应用：
 
@@ -59,20 +75,29 @@ kubectl apply -f deployment.yaml
 kubectl apply -f service.yaml
 ```
 
-### 5. 检查部署状态
+### 6. 检查部署状态
 
 ```bash
 # 检查 Pod 状态
-kubectl get pods -l app=ai-toolkit
+kubectl get pods -n ai-toolkit -l app=ai-toolkit
 
 # 检查服务状态
-kubectl get svc ai-toolkit
+kubectl get svc -n ai-toolkit ai-toolkit
 
 # 查看 Pod 日志
-kubectl logs -l app=ai-toolkit -f
+kubectl logs -n ai-toolkit -l app=ai-toolkit -f
 ```
 
 ## 配置说明
+
+### 命名空间
+
+所有资源都部署在 `ai-toolkit` 命名空间中，这样可以：
+- 隔离资源，避免与其他应用冲突
+- 便于管理和清理
+- 支持多环境部署（如 dev、staging、prod）
+
+所有 kubectl 命令都需要使用 `-n ai-toolkit` 参数来指定命名空间。
 
 ### GPU 支持
 
@@ -133,10 +158,10 @@ kubectl logs -l app=ai-toolkit -f
 
 ```bash
 # 查看 Pod 详细信息
-kubectl describe pod -l app=ai-toolkit
+kubectl describe pod -n ai-toolkit -l app=ai-toolkit
 
 # 查看 Pod 日志
-kubectl logs -l app=ai-toolkit
+kubectl logs -n ai-toolkit -l app=ai-toolkit
 ```
 
 ### GPU 不可用
@@ -147,19 +172,22 @@ kubectl describe node <node-name> | grep nvidia.com/gpu
 
 # 检查设备插件
 kubectl get daemonset -n kube-system | grep nvidia
+
+# 检查 Pod 的 GPU 分配
+kubectl describe pod -n ai-toolkit -l app=ai-toolkit | grep nvidia.com/gpu
 ```
 
 ### 存储问题
 
 ```bash
 # 检查 PVC 状态
-kubectl get pvc ai-toolkit-storage
+kubectl get pvc -n ai-toolkit ai-toolkit-storage
 
 # 查看 PVC 详细信息
-kubectl describe pvc ai-toolkit-storage
+kubectl describe pvc -n ai-toolkit ai-toolkit-storage
 
 # 如果需要查看存储使用情况，可以进入 Pod 查看
-kubectl exec -it <pod-name> -- df -h /app/ai-toolkit
+kubectl exec -it -n ai-toolkit <pod-name> -- df -h /app/ai-toolkit
 ```
 
 ## 更新部署
@@ -167,7 +195,7 @@ kubectl exec -it <pod-name> -- df -h /app/ai-toolkit
 更新镜像版本：
 
 ```bash
-kubectl set image deployment/ai-toolkit ai-toolkit=ostris/aitoolkit:<new-tag>
+kubectl set image deployment/ai-toolkit ai-toolkit=ostris/aitoolkit:<new-tag> -n ai-toolkit
 ```
 
 或者编辑 deployment.yaml 后重新应用：
@@ -178,11 +206,21 @@ kubectl apply -f deployment.yaml
 
 ## 删除部署
 
+使用清理脚本（推荐）：
+
+```bash
+cd k8s
+./cleanup.sh
+```
+
+或手动删除：
+
 ```bash
 kubectl delete -f service.yaml
 kubectl delete -f deployment.yaml
 kubectl delete -f pvc.yaml  # 注意：这会删除所有数据
 kubectl delete -f secret.yaml
+kubectl delete -f namespace.yaml  # 可选：删除整个命名空间
 ```
 
 ## 注意事项
