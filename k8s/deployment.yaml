@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-toolkit
+  labels:
+    app: ai-toolkit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-toolkit
+  template:
+    metadata:
+      labels:
+        app: ai-toolkit
+    spec:
+      containers:
+      - name: ai-toolkit
+        image: ostris/aitoolkit:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8675
+          name: http
+          protocol: TCP
+        env:
+        - name: AI_TOOLKIT_AUTH
+          valueFrom:
+            secretKeyRef:
+              name: ai-toolkit-secret
+              key: auth-token
+        - name: NODE_ENV
+          value: "production"
+        - name: TZ
+          value: "UTC"
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "32Gi"
+            cpu: "8"
+            nvidia.com/gpu: 1
+        volumeMounts:
+        - name: ai-toolkit-storage
+          mountPath: /root/.cache/huggingface/hub
+          subPath: huggingface-cache
+        - name: ai-toolkit-storage
+          mountPath: /app/ai-toolkit/aitk_db.db
+          subPath: database/aitk_db.db
+        - name: ai-toolkit-storage
+          mountPath: /app/ai-toolkit/datasets
+          subPath: datasets
+        - name: ai-toolkit-storage
+          mountPath: /app/ai-toolkit/output
+          subPath: output
+        - name: ai-toolkit-storage
+          mountPath: /app/ai-toolkit/config
+          subPath: config
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8675
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8675
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: ai-toolkit-storage
+        persistentVolumeClaim:
+          claimName: ai-toolkit-storage
+      nodeSelector:
+        # 可选：指定需要 GPU 的节点
+        # accelerator: nvidia-tesla-v100
+      tolerations:
+        # 可选：如果节点有污点，需要添加容忍度
+        # - key: nvidia.com/gpu
+        #   operator: Exists
+        #   effect: NoSchedule
+

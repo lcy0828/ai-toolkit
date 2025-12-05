@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-toolkit
+  labels:
+    app: ai-toolkit
+spec:
+  type: LoadBalancer  # 或者使用 NodePort、ClusterIP，根据你的需求
+  ports:
+  - port: 8675
+    targetPort: 8675
+    protocol: TCP
+    name: http
+  selector:
+    app: ai-toolkit
+
