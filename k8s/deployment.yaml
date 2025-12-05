@@ -19,6 +19,24 @@ spec:
       - name: ai-toolkit
         image: ostris/aitoolkit:latest
         imagePullPolicy: Always
+        command: ['/bin/bash', '-c']
+        args:
+          - |
+            # 设置数据库符号链接
+            if [ -d /app/ai-toolkit/database ]; then
+              # 删除可能存在的旧文件
+              rm -f /app/ai-toolkit/aitk_db.db
+              # 创建符号链接指向数据库目录中的文件
+              if [ -f /app/ai-toolkit/database/aitk_db.db ]; then
+                ln -s /app/ai-toolkit/database/aitk_db.db /app/ai-toolkit/aitk_db.db
+              else
+                # 如果数据库文件不存在，创建空文件并链接
+                touch /app/ai-toolkit/database/aitk_db.db
+                ln -s /app/ai-toolkit/database/aitk_db.db /app/ai-toolkit/aitk_db.db
+              fi
+            fi
+            # 执行原始启动脚本
+            exec /start.sh
         ports:
         - containerPort: 8675
           name: http
@@ -47,8 +65,8 @@ spec:
           mountPath: /root/.cache/huggingface/hub
           subPath: huggingface-cache
         - name: ai-toolkit-storage
-          mountPath: /app/ai-toolkit/aitk_db.db
-          subPath: database/aitk_db.db
+          mountPath: /app/ai-toolkit/database
+          subPath: database
         - name: ai-toolkit-storage
           mountPath: /app/ai-toolkit/datasets
           subPath: datasets
