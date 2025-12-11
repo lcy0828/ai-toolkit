@@ -21,24 +21,6 @@ spec:
       # 或者使用 nodeSelector 选择 GPU 节点
       # nodeSelector:
       #   accelerator: nvidia-tesla-k80  # 根据你的 GPU 节点标签调整
-      # Init Container: 准备数据库文件
-      # 因为 Kubernetes 无法直接将文件挂载到已存在的文件路径，所以先挂载目录
-      initContainers:
-      - name: init-db
-        image: busybox:latest
-        command: ['sh', '-c']
-        args:
-          - |
-            # 确保数据目录存在
-            mkdir -p /data
-            # 如果数据库文件不存在，创建一个空文件（首次运行）
-            if [ ! -f /data/aitk_db.db ]; then
-              touch /data/aitk_db.db
-            fi
-        volumeMounts:
-        - name: storage
-          mountPath: /data
-          subPath: data
       containers:
       - name: ai-toolkit
         image: ostris/aitoolkit:latest
