@@ -15,31 +15,19 @@ spec:
       labels:
         app: ai-toolkit
     spec:
+      # GPU 支持
+      # 如果集群使用 NVIDIA GPU Runtime Class，取消下面的注释
+      # runtimeClassName: nvidia
+      # 或者使用 nodeSelector 选择 GPU 节点
+      # nodeSelector:
+      #   accelerator: nvidia-tesla-k80  # 根据你的 GPU 节点标签调整
       containers:
       - name: ai-toolkit
         image: ostris/aitoolkit:latest
         imagePullPolicy: Always
-        command: ['/bin/bash', '-c']
-        args:
-          - |
-            # 设置数据库符号链接
-            if [ -d /app/ai-toolkit/database ]; then
-              # 删除可能存在的旧文件
-              rm -f /app/ai-toolkit/aitk_db.db
-              # 创建符号链接指向数据库目录中的文件
-              if [ -f /app/ai-toolkit/database/aitk_db.db ]; then
-                ln -s /app/ai-toolkit/database/aitk_db.db /app/ai-toolkit/aitk_db.db
-              else
-                # 如果数据库文件不存在，创建空文件并链接
-                touch /app/ai-toolkit/database/aitk_db.db
-                ln -s /app/ai-toolkit/database/aitk_db.db /app/ai-toolkit/aitk_db.db
-              fi
-            fi
-            # 执行原始启动脚本
-            exec /start.sh
         ports:
-        - containerPort: 8675
-          name: http
+        - name: http
+          containerPort: 8675
           protocol: TCP
         env:
         - name: AI_TOOLKIT_AUTH
@@ -52,54 +40,41 @@ spec:
         - name: TZ
           value: "UTC"
         resources:
-          requests:
-            memory: "8Gi"
-            cpu: "2"
-            nvidia.com/gpu: 1
           limits:
-            memory: "32Gi"
-            cpu: "8"
+            # 根据实际 GPU 数量调整，如果需要使用所有 GPU，设置为节点上的 GPU 数量
+            nvidia.com/gpu: 1  # 或者设置为具体数量，如 2, 4, 8 等
+          requests:
             nvidia.com/gpu: 1
         volumeMounts:
-        - name: ai-toolkit-storage
+        # HuggingFace 缓存
+        - name: storage
           mountPath: /root/.cache/huggingface/hub
           subPath: huggingface-cache
-        - name: ai-toolkit-storage
-          mountPath: /app/ai-toolkit/database
-          subPath: database
-        - name: ai-toolkit-storage
+        # 数据库文件
+        - name: storage
+          mountPath: /app/ai-toolkit/aitk_db.db
+          subPath: aitk_db.db
+        # 数据集目录
+        - name: storage
           mountPath: /app/ai-toolkit/datasets
           subPath: datasets
-        - name: ai-toolkit-storage
+        # 输出目录
+        - name: storage
           mountPath: /app/ai-toolkit/output
           subPath: output
-        - name: ai-toolkit-storage
+        # 配置目录
+        - name: storage
           mountPath: /app/ai-toolkit/config
           subPath: config
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 8675
-          initialDelaySeconds: 60
-          periodSeconds: 30
-          timeoutSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 8675
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
+        # 共享内存 60GB
+        - name: shm
+          mountPath: /dev/shm
       volumes:
-      - name: ai-toolkit-storage
+      - name: storage
         persistentVolumeClaim:
           claimName: ai-toolkit-storage
-      nodeSelector:
-        # 可选：指定需要 GPU 的节点
-        # accelerator: nvidia-tesla-v100
-      tolerations:
-        # 可选：如果节点有污点，需要添加容忍度
-        # - key: nvidia.com/gpu
-        #   operator: Exists
-        #   effect: NoSchedule
-
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 60Gi
+      restartPolicy: Always
