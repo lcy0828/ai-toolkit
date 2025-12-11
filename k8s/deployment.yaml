@@ -21,10 +21,44 @@ spec:
       # 或者使用 nodeSelector 选择 GPU 节点
       # nodeSelector:
       #   accelerator: nvidia-tesla-k80  # 根据你的 GPU 节点标签调整
+      # Init Container: 准备数据库文件
+      # 因为 Kubernetes 无法直接将文件挂载到已存在的文件路径，所以先挂载目录
+      initContainers:
+      - name: init-db
+        image: busybox:latest
+        command: ['sh', '-c']
+        args:
+          - |
+            # 确保数据目录存在
+            mkdir -p /data
+            # 如果数据库文件不存在，创建一个空文件（首次运行）
+            if [ ! -f /data/aitk_db.db ]; then
+              touch /data/aitk_db.db
+            fi
+        volumeMounts:
+        - name: storage
+          mountPath: /data
+          subPath: data
       containers:
       - name: ai-toolkit
         image: ostris/aitoolkit:latest
         imagePullPolicy: Always
+        # 在启动前创建数据库文件的符号链接
+        command: ['/bin/bash', '-c']
+        args:
+          - |
+            # 如果目标路径已存在且不是符号链接，先备份或删除
+            if [ -f /app/ai-toolkit/aitk_db.db ] && [ ! -L /app/ai-toolkit/aitk_db.db ]; then
+              echo "警告: /app/ai-toolkit/aitk_db.db 已存在，移动到备份位置"
+              mv /app/ai-toolkit/aitk_db.db /app/ai-toolkit/aitk_db.db.backup || true
+            fi
+            # 创建数据库文件的符号链接（如果不存在）
+            if [ ! -L /app/ai-toolkit/aitk_db.db ]; then
+              ln -s /app/ai-toolkit/data/aitk_db.db /app/ai-toolkit/aitk_db.db
+              echo "已创建数据库文件符号链接: /app/ai-toolkit/aitk_db.db -> /app/ai-toolkit/data/aitk_db.db"
+            fi
+            # 执行原始启动脚本
+            exec /start.sh
         ports:
         - name: http
           containerPort: 8675
@@ -50,10 +84,11 @@ spec:
         - name: storage
           mountPath: /root/.cache/huggingface/hub
           subPath: huggingface-cache
-        # 数据库文件
+        # 数据库文件 - 挂载 data 目录，数据库文件在 data/aitk_db.db
+        # 应用期望路径是 /app/ai-toolkit/aitk_db.db，需要通过启动脚本创建符号链接
         - name: storage
-          mountPath: /app/ai-toolkit/aitk_db.db
-          subPath: aitk_db.db
+          mountPath: /app/ai-toolkit/data
+          subPath: data
         # 数据集目录
         - name: storage
           mountPath: /app/ai-toolkit/datasets

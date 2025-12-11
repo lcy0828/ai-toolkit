@@ -11,5 +11,5 @@ spec:
       # 合并所有存储需求：HuggingFace缓存(100Gi) + 数据库(10Gi) + 数据集(500Gi) + 输出(200Gi) + 配置(5Gi) = 815Gi
       # 建议设置为 1Ti 以留有余量
       storage: 200Gi  # 根据实际需求调整大小
-  storageClassName: standard  # 根据你的集群调整存储类
+  storageClassName: nfs-k8s  # 根据你的集群调整存储类
 
